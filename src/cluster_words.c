@@ -21,7 +21,6 @@
 #include <math.h>
 #include <stdint.h>
 
-#include "hash.h"
 #include "heap.h"
 #include "list.h"
 #include "levenshtein.h"
