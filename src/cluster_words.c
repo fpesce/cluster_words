@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
-#include <math.h>
 #include <stdint.h>
 
 #include "heap.h"
@@ -26,7 +25,7 @@
 #include "levenshtein.h"
 #include "mmap_wrapper.h"
 
-#define EPSILON 0.05
+#define EPSILON 0.4
 #define IGNORE_SIZE 4
 
 struct cluster_t {
@@ -72,7 +71,7 @@ static inline int process_file(const char *file)
     word_t *words;
     distance_t *d;
     const char *word;
-    float *distance_matrix;
+    float *similarity;
     size_t i, j, idx, len, nb_words;
     int rv;
 
@@ -96,7 +95,7 @@ static inline int process_file(const char *file)
     }
 
     words = calloc(nb_words, sizeof(struct word_t));
-    distance_matrix = calloc(nb_words * nb_words, sizeof(float));
+    similarity = calloc(nb_words * nb_words, sizeof(float));
 
     /* Second pass: get words. */
     fprintf(stderr, "second pass\n");
@@ -124,12 +123,12 @@ static inline int process_file(const char *file)
     /* Third pass: get words distances. */
     fprintf(stderr, "third pass\n");
     for (i = 0; i < nb_words; i++) {
-        distance_matrix[i + i * nb_words] = 1.0;
+        similarity[i + i * nb_words] = 1.0;
         for (j = i + 1; j < nb_words; j++) {
             d = malloc(sizeof(struct distance_t));
-            distance_matrix[i + j * nb_words] = levenshtein_norm_distance(words[i].word, words[i].word_len, words[j].word, words[j].word_len);
-            distance_matrix[j + i * nb_words] = distance_matrix[i + j * nb_words];
-            d->value = distance_matrix[i + j *nb_words];
+            similarity[i + j * nb_words] = levenshtein_norm_distance(words[i].word, words[i].word_len, words[j].word, words[j].word_len);
+            similarity[j + i * nb_words] = similarity[i + j * nb_words];
+            d->value = similarity[i + j *nb_words];
             d->word_1 = i;
             d->word_2 = j;
             heap_insert(heap, d);
@@ -162,11 +161,10 @@ static inline int process_file(const char *file)
             /*                                        (int) words[d->word_1].word_len, words[d->word_1].word); */
             list_enqueue_elt(words[d->word_1].cluster->words, &(words[d->word_2]));
             words[d->word_2].cluster = words[d->word_1].cluster;
-        } else if ((words[d->word_1].cluster != words[d->word_2].cluster) && (d->value > (2 * EPSILON))) {
+        } else if ((words[d->word_1].cluster != words[d->word_2].cluster) && (d->value > EPSILON)) {
             /*
              * Compare each word of cluster 1 to each word of cluster 2, if the
-             * maximum measured distance is greater than current distance +
-             * EPSILON do not merge them.
+             * maximum measured similarity is smaller than EPSILON do not merge them.
              */
             cell_t *cellword1, *cellword2;
             float max_dist;
@@ -187,10 +185,10 @@ static inline int process_file(const char *file)
                     word_t *word2;
 
                     word2 = list_get(cellword2);
-                    if (fabsf(distance_matrix[word1->idx + word2->idx * nb_words] - d->value) > EPSILON) {
+                    if (similarity[word1->idx + word2->idx * nb_words] < EPSILON) {
                         mismatch = 1;
                         /* fprintf(stderr, "%f mismatch cluster [%.*s](%zi)(%p) [%.*s](%zi)(%p)\n", */
-                                /* fabsf(distance_matrix[word1->idx + word2->idx * nb_words] - d->value), */
+                                /* similarity[word1->idx + word2->idx * nb_words], */
                                 /* (int) word1->word_len, word1->word, word1->idx, word1->cluster, */
                                 /* (int) word2->word_len, word2->word, word2->idx, word2->cluster); */
                     }

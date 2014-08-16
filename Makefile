@@ -3,8 +3,6 @@ CFLAGS = -Wall -O0 -ggdb
 
 INCLUDE = -Isrc/
 
-LIBS = -lm
-
 MODULES = src/cluster_words.c mmap_wrapper.o levenshtein.o heap.o list.o
 
 TARGET = cluster_words
