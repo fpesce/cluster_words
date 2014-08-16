@@ -3,7 +3,9 @@ CFLAGS = -Wall -O0 -ggdb
 
 INCLUDE = -Isrc/
 
-MODULES = src/cluster_words.c mmap_wrapper.o levenshtein.o
+LIBS = -lm
+
+MODULES = src/cluster_words.c mmap_wrapper.o levenshtein.o heap.o hash.o list.o
 
 TARGET = cluster_words
 
@@ -13,6 +15,15 @@ clean:
 	rm -f *.o
 	rm -f src/*~
 	rm -f $(TARGET)
+
+hash.o: src/hash.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c src/hash.c
+
+list.o: src/list.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c src/list.c
+
+heap.o: src/heap.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c src/heap.c
 
 mmap_wrapper.o: src/mmap_wrapper.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c src/mmap_wrapper.c

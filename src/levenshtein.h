@@ -20,8 +20,8 @@
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
-size_t levenshtein_distance(const char *s1, size_t l1, const char *s2, size_t l2, unsigned char err_min);
+size_t levenshtein_distance(const char *s1, size_t l1, const char *s2, size_t l2);
 
-size_t levenshtein_distance2(const char *s1, size_t l1, const char *s2, size_t l2, unsigned char *err_min);
+float levenshtein_norm_distance(const char *s1, size_t l1, const char *s2, size_t l2);
 
 #endif /* LEVENSHTEIN_H */

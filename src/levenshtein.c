@@ -5,141 +5,106 @@
 
 #include "levenshtein.h"
 
-static size_t levenshtein_rec(size_t * dbuf, size_t i, size_t j, const char *s1, size_t l1, const char *s2, size_t l2,
-			      unsigned char *err_min)
-{
-    size_t cur, path_diag, path_right, path_down, i_1, j_1, pos, cur_1, min;
-
-    cur = dbuf[l2 * i + j];
-    cur_1 = cur + 1;
-    i_1 = i + 1;
-    j_1 = j + 1;
-    path_diag = path_right = path_down = (size_t) - 1;
-    pos = (l2 * i_1) + j_1;
-    if ((i_1 < l1) && (j_1 < l2)) {
-	if (tolower(s1[i + 1]) == tolower(s2[j + 1])) {
-	    if (dbuf[pos] > cur) {
-		dbuf[pos] = cur;
-		path_diag = levenshtein_rec(dbuf, i + 1, j + 1, s1, l1, s2, l2, err_min);
-	    }
-	}
-	else {
-	    if (cur_1 < *err_min) {
-		if (dbuf[pos] > cur_1) {
-		    dbuf[pos] = cur_1;
-		    path_diag = levenshtein_rec(dbuf, i + 1, j + 1, s1, l1, s2, l2, err_min);
-		}
-	    }
-	}
-    }
-    else {
-	if ((i_1 == l1) && (j_1 == l2)) {
-	    path_diag = cur;
-	    if (cur < *err_min)
-		*err_min = cur;
-	}
-    }
-    min = path_diag;
-    pos = (l2 * i_1) + j;
-    if ((i_1 < l1) && (j < l2)) {
-	if (cur_1 < *err_min) {
-	    if (dbuf[pos] > cur_1) {
-		dbuf[pos] = cur_1;
-		path_right = levenshtein_rec(dbuf, i + 1, j, s1, l1, s2, l2, err_min);
-	    }
-	}
-    }
-    else {
-	if ((i_1 == l1) && (j == l2)) {
-	    path_right = cur;
-	    if (cur < *err_min)
-		*err_min = cur;
-	}
-    }
-    if (path_right < min)
-	min = path_right;
-    pos = (l2 * i) + j_1;
-    if ((i < l1) && (j_1 < l2)) {
-	if (cur_1 < *err_min) {
-	    if (dbuf[pos] > cur_1) {
-		dbuf[pos] = cur_1;
-		path_down = levenshtein_rec(dbuf, i, j + 1, s1, l1, s2, l2, err_min);
-	    }
-	}
-    }
-    else {
-	if ((i == l1) && (j_1 == l2)) {
-	    path_down = cur;
-	    if (cur < *err_min)
-		*err_min = cur;
-	}
-    }
-    if (path_down < min)
-	min = path_down;
-
-    return min;
-}
-
-extern size_t levenshtein_distance2(const char *s1, size_t l1, const char *s2, size_t l2, unsigned char *err_min)
-{
-    size_t tmpbuf[1024], *dbuf, l1l2, l2_1, l1_1;
-
-    if (*err_min > 6) {
-	l1l2 = levenshtein_distance(s1, l1, s2, l2, *err_min);
-	if (l1l2 < *err_min)
-	    *err_min = l1l2;
-	return l1l2;
-    }
-
-    l1_1 = l1 + 1;
-    l2_1 = l2 + 1;
-    l1l2 = (l1_1 * l2_1);
-    if (l1l2 > (sizeof(tmpbuf) / sizeof(size_t))) {
-	dbuf = malloc(l1l2 * sizeof(size_t));
-    }
-    else {
-	dbuf = tmpbuf;
-    }
-    memset(dbuf, (size_t) - 1, l1l2 * sizeof(size_t));
-
-    if (*s1 == *s2)
-	dbuf[0] = 0;
-    else
-	dbuf[0] = 1;
-
-    return levenshtein_rec(dbuf, 0, 0, s1, l1, s2, l2, err_min);
-}
-
 #define MIN3(a,b,c) (((a)<(b))?(((a)<(c))?(a):(((b)<(c))?(b):(c))):(((b)<(c))?(b):(((a)<(c))?(a):(c))))
-extern size_t levenshtein_distance(const char *s1, size_t l1, const char *s2, size_t l2, unsigned char err_min)
+static inline size_t levenshtein_distance_internal(const char *s1, size_t l1, const char *s2, size_t l2, size_t *zsize)
 {
-    size_t tmpbuf[1024], *dbuf, l1l2, l2_1, l1_1, i, j, cost;
+    size_t tmpbuf[1024], *dbuf;
+    size_t l1l2, l2_1, l1_1, cost, result;
+    int i, j, k;
 
     l1_1 = l1 + 1;
     l2_1 = l2 + 1;
     l1l2 = (l1_1 * l2_1);
     if (l1l2 > (sizeof(tmpbuf) / sizeof(size_t))) {
-	dbuf = malloc(l1l2 * sizeof(size_t));
+        dbuf = malloc(l1l2 * sizeof(size_t));
     }
     else {
-	dbuf = tmpbuf;
+        dbuf = tmpbuf;
     }
     memset(dbuf, 0, l1l2 * sizeof(size_t));
 
-    for (i = 0; i < l1_1; i++)
-	dbuf[l2_1 * i] = i;
-    for (j = 0; j < l2_1; j++)
-	dbuf[j] = j;
-
+    dbuf[0] = 0;
     for (i = 1; i < l1_1; i++)
-	for (j = 1; j < l2_1; j++) {
-	    if (s1[i - 1] == s2[j - 1])
-		cost = 0;
-	    else
-		cost = 1;
-	    dbuf[l2_1 * i + j] =
-		MIN3(dbuf[l2_1 * (i - 1) + j] + 1, dbuf[l2_1 * i + (j - 1)] + 1, dbuf[l2_1 * (i - 1) + (j - 1)] + cost);
-	}
+        dbuf[l2_1 * i] = i;
 
-    return dbuf[(l1l2) - 1];
+    for (j = 1; j < l2_1; j++) {
+        dbuf[j] = j;
+        for (i = 1; i < l1_1; i++) {
+            size_t above, left, diag;
+
+            if (tolower(s1[i - 1]) != tolower(s2[j - 1])) {
+                above = dbuf[l2_1 * (i - 1) + j] + 1;
+                left = dbuf[l2_1 * i + (j - 1)] + 1;
+                diag = dbuf[l2_1 * (i - 1) + (j - 1)] + 1;
+                dbuf[l2_1 * i + j] = MIN3(above, left, diag);
+            } else {
+                dbuf[l2_1 * i + j] = dbuf[l2_1 * (i - 1) + (j - 1)];
+            }
+        }
+    }
+    result = dbuf[(l1l2) - 1];
+    /* The following code computes an optimal alignment length */
+    i = l1;
+    j = l2;
+    *zsize = l1_1 + l2_1;
+    k = 0;
+    while ((i != -1) && (j != -1)) {
+        cost = (tolower(s1[i - 1]) == tolower(s2[j - 1])) ? 0 : 1;
+        if (dbuf[l2_1 * i + j] == (dbuf[l2_1 * (i - 1) + (j - 1)] + cost)) {
+            i--, j--, k++;
+        } else if (dbuf[l2_1 * i + j] == (dbuf[l2_1 * (i - 1) + j] + 1)) {
+                i--, k++;
+        } else {
+                j--, k++;
+        }
+    }
+    while (i != -1) {
+        i--, k++;
+    }
+    while (j != -1) {
+        j--, k++;
+    }
+    *zsize = k - 1;
+
+    if(dbuf != tmpbuf)
+        free(dbuf);
+
+    return result;
 }
+
+extern size_t levenshtein_distance(const char *s1, size_t l1, const char *s2, size_t l2)
+{
+    size_t zsize;
+    return levenshtein_distance_internal(s1, l1, s2, l2, &zsize);
+}
+
+extern float levenshtein_norm_distance(const char *s1, size_t l1, const char *s2, size_t l2)
+{
+    size_t lev_d;
+    size_t zsize;
+    float result;
+    /*
+     * Goal is to align 2 strings:
+     * _SOURCESTR   10 (norm aligned len)
+     * DST____STR   10 (norm aligned len)
+     * I SDDDD    = 6
+     * Differences are sum of substitution/deletion/insertion
+     * Normalized distance is (norm_len - 6) / norm_len; => 40% in this example
+     */
+
+    lev_d = levenshtein_distance_internal(s1, l1, s2, l2, &zsize);
+
+    result = (zsize - lev_d) / (float) zsize;
+
+    return result;
+}
+
+/*
+int main(int argc, const char **argv)
+{
+    fprintf(stdout, "a: %f\n", levenshtein_norm_distance("ERDAWCQPGKWY", strlen("ERDAWCQPGKWY"), "EAWACQGKL", strlen("EAWACQGKL")));
+    fprintf(stdout, "b: %f\n", levenshtein_norm_distance("SOURCESTR", strlen("SOURCESTR"), "DSTSTR", strlen("DSTSTR")));
+    fprintf(stdout, "c: %f\n", levenshtein_norm_distance("Saturday", strlen("Saturday"), "Sunday", strlen("Sunday")));
+    return 0;
+}
+*/
